@@ -1,0 +1,27 @@
+{
+  "title": "简易 FTP 服务器",
+  "settings": {
+    "rootDir": "共享目录",
+    "username": "用户名",
+    "password": "密码",
+    "port": "端口",
+    "autoStart": "开机启动",
+    "selectDir": "选择目录",
+    "start": "启动服务器",
+    "stop": "停止服务器"
+  },
+  "messages": {
+    "serverStarted": "FTP 服务器已启动",
+    "serverStopped": "FTP 服务器已停止",
+    "selectDirectory": "请选择一个目录",
+    "configSaved": "配置已保存",
+    "configError": "配置错误",
+    "serverRunning": "服务器运行中",
+    "serverNotRunning": "服务器未运行"
+  },
+  "tooltips": {
+    "autoStart": "系统启动时自动运行服务器",
+    "port": "FTP 服务器端口（默认：2121）",
+    "rootDir": "通过 FTP 共享的目录"
+  }
+}

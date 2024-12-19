@@ -1,89 +1,111 @@
-# 项目说明
+# 🚀 Easy FTP Server
 
-基础的Go桌面应用，使用Wails框架开发。
-## 技术栈
+[English](README.md) | [中文](README_ZH.md)
 
-本项目使用以下技术栈：
-- [Wails](https://wails.io/) - Go桌面应用开发框架
-- [React](https://react.dev/) - 前端UI框架
-- [Vite](https://vitejs.dev/) - 前端构建工具
-- [Tailwind CSS](https://tailwindcss.com/) - CSS框架
+> Tired of setting up FTP servers?
+> 
+> Frustrated with complex configurations?
+> 
+> Confused by command-line operations?
+>
+> Don't worry, Easy FTP Server is here! 🎉
 
-## 环境要求
+## 😎 What is this?
 
-在开始之前，请确保已安装以下工具：
+This is a **super simple** FTP server!
+
+- ✨ 3-second setup, one-click start
+- 🎯 No complex commands to remember
+- 🔒 Built-in user authentication, secure and reliable
+- 🎨 Clean interface, foolproof operation
+- 🔄 Support auto-start, worry-free
+
+It's that simple! Choose a directory, set a password, click start, done! 🚀
+
+## 💫 Interface Preview
+
+![Interface Preview](assets/demo_en.png)
+
+## 🛠️ Open Source Credits
+
+This project is built upon these excellent open source projects:
+
+- [Wails](https://wails.io/) - The Go framework for building cross-platform desktop apps
+- [React](https://react.dev/) - The library for web and native user interfaces
+- [Tailwind CSS](https://tailwindcss.com/) - A utility-first CSS framework
+- [goftp/server](https://github.com/goftp/server) - A FTP server implementation in Go
+- [systray](https://github.com/getlantern/systray) - Cross-platform system tray implementation
+- [go-ole](https://github.com/go-ole/go-ole) - Go bindings for Windows COM
+- [vite](https://vitejs.dev/) - Next generation frontend tooling
+
+Special thanks to these amazing projects that made this simple FTP server possible!
+
+## 🎯 Requirements
+
+- Windows 7+ (64-bit)
+
+## 🗺️ Roadmap
+
+- [x] Windows version release
+- [ ] ⭐️ 100 stars - Mac version support
+- [ ] More features coming with your suggestions!
+
+## 🚀 Quick Start
+
+### User Guide
+
+1. Download the latest version
+2. Double click to run
+3. Set share directory and password
+4. Click start
+5. Perfect! 🎉
+
+### Development Guide
+
+#### Environment Setup
+
+```bash
+# Make sure you have installed
 - Go 1.18+
 - Node.js 14+
-- npm 或 yarn
+- npm or yarn
 - Wails CLI
-
-## 开发说明
-
-### 项目启动
-
-1. 安装依赖
-```bash
-# 前端依赖安装
-cd frontend
-npm install  # 或 yarn
-
-# 回到项目根目录
-cd ..
 ```
 
-2. 开发模式启动
+#### Development Mode
+
 ```bash
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Start development server
+cd ..
 wails dev
 ```
 
-此命令会启动：
-- Vite 开发服务器，支持前端代码热重载
-- 后端服务，地址为 http://localhost:34115，可在浏览器中调试Go方法
-
-### 项目测试
+#### Build
 
 ```bash
-# 运行前端测试
-cd frontend
-npm test  # 或 yarn test
-
-# 运行后端测试
-go test ./...
-```
-
-### 项目编译
-
-1. 开发环境编译
-```bash
+# Generate release version
 wails build
 ```
 
-2. 生产环境编译
-```bash
-# Windows
-wails build -platform windows/amd64 -clean
+## 🤝 Contributing
 
-# MacOS
-wails build -platform darwin/universal -clean
+PRs are welcome! But before that, please ensure:
+1. Your code is simple (we love simplicity!)
+2. Your code is elegant (we love elegance too!)
+3. You're in a good mood (this is the most important!)
 
-# Linux
-wails build -platform linux/amd64 -clean
-```
+## 📝 License
 
-编译后的文件将输出到 `build` 目录。
+MIT - Use it freely, just give us a star! ⭐️
 
-## 项目配置
+## 🤔 FAQ
 
-- 项目配置文件：`wails.json`
-- 更多配置说明请参考：https://wails.io/docs/reference/project-config
+Q: Why is this project so simple?
+A: Because simplicity is beautiful!
 
-## 目录结构
-
-```
-.
-├── frontend/          # 前端代码目录
-│   ├── src/          # React源码
-│   ├── public/       # 静态资源
-│   └── package.json  # 前端依赖配置
-├── app.go            # 后端入口
-└── main.go          # 主程序入口
+Q: Will this project stay this simple?
+A: Yes, we will continue to keep it simple!

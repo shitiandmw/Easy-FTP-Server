@@ -12,6 +12,8 @@ import (
 	_ "embed"
 
 	"github.com/getlantern/systray"
+	"github.com/go-ole/go-ole"
+	"github.com/go-ole/go-ole/oleutil"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -246,18 +248,46 @@ func (a *App) SetAutoStart(enable bool) error {
 			return err
 		}
 
-		// 创建一个批处理文件来启动程序
-		batPath := filepath.Join(startupPath, "EasyFTPServer.bat")
-		batContent := fmt.Sprintf("@echo off\nstart \"\" \"%s\"", exePath)
-		err = os.WriteFile(batPath, []byte(batContent), 0644)
+		// 初始化 COM
+		err = ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
 		if err != nil {
 			return err
 		}
+		defer ole.CoUninitialize()
+
+		// 创建 Shell 对象
+		shell, err := oleutil.CreateObject("WScript.Shell")
+		if err != nil {
+			return err
+		}
+		defer shell.Release()
+
+		// 获取 IDispatch
+		shellDispatch, err := shell.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return err
+		}
+		defer shellDispatch.Release()
+
+		// 创建快捷方式
+		shortcut, err := oleutil.CallMethod(shellDispatch, "CreateShortcut", linkPath)
+		if err != nil {
+			return err
+		}
+		defer shortcut.ToIDispatch().Release()
+
+		// 设置快捷方式属性
+		oleutil.PutProperty(shortcut.ToIDispatch(), "TargetPath", exePath)
+		oleutil.PutProperty(shortcut.ToIDispatch(), "WorkingDirectory", filepath.Dir(exePath))
+		oleutil.PutProperty(shortcut.ToIDispatch(), "Description", "Easy FTP Server")
+
+		// 保存快捷方式
+		oleutil.CallMethod(shortcut.ToIDispatch(), "Save")
 	} else {
-		// 删除批处理文件
-		batPath := filepath.Join(startupPath, "EasyFTPServer.bat")
-		_ = os.Remove(batPath)
-		_ = os.Remove(linkPath) // 同时尝试删除可能存在的快捷方式文件
+		// 删除快捷方式文件
+		_ = os.Remove(linkPath)
+		// 删除可能存在的旧的批处理文件（兼容性清理）
+		_ = os.Remove(filepath.Join(startupPath, "EasyFTPServer.bat"))
 	}
 
 	return nil
@@ -265,7 +295,7 @@ func (a *App) SetAutoStart(enable bool) error {
 
 // 检查是否开机启动
 func (a *App) CheckAutoStart() bool {
-	startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "EasyFTPServer.bat")
+	startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "EasyFTPServer.lnk")
 	_, err := os.Stat(startupPath)
 	return err == nil
 }

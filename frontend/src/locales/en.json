@@ -1,0 +1,27 @@
+{
+  "title": "Easy FTP Server",
+  "settings": {
+    "rootDir": "Share Directory",
+    "username": "Username",
+    "password": "Password",
+    "port": "Port",
+    "autoStart": "Auto Start",
+    "selectDir": "Select Directory",
+    "start": "Start Server",
+    "stop": "Stop Server"
+  },
+  "messages": {
+    "serverStarted": "FTP Server Started",
+    "serverStopped": "FTP Server Stopped",
+    "selectDirectory": "Please select a directory",
+    "configSaved": "Configuration saved",
+    "configError": "Configuration error",
+    "serverRunning": "Server is running",
+    "serverNotRunning": "Server is not running"
+  },
+  "tooltips": {
+    "autoStart": "Start server when system boots",
+    "port": "FTP server port (default: 2121)",
+    "rootDir": "Directory to share via FTP"
+  }
+}

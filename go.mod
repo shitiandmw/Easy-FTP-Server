@@ -6,6 +6,7 @@ toolchain go1.22.3
 
 require (
 	github.com/getlantern/systray v1.2.2
+	github.com/go-ole/go-ole v1.3.0
 	github.com/goftp/server v0.0.0-20200708154336-f64f7c2d8a42
 	github.com/wailsapp/wails/v2 v2.9.2
 )
@@ -18,7 +19,6 @@ require (
 	github.com/getlantern/hex v0.0.0-20190417191902-c6586a6fe0b7 // indirect
 	github.com/getlantern/hidden v0.0.0-20190325191715-f02dbb02be55 // indirect
 	github.com/getlantern/ops v0.0.0-20190325191751-d70cb0d6f85f // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/goftp/file-driver v0.0.0-20180502053751-5d604a0fc0c9 // indirect

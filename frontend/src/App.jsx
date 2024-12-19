@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StartFTPServer, StopFTPServer, OpenDirectoryDialog, LoadConfig, SaveConfig, SetAutoStart, CheckAutoStart, IsServerRunning, MinimizeToTray } from "../wailsjs/go/main/App";
 import { WindowMinimise, Quit } from "../wailsjs/runtime/runtime";
+import LanguageSwitch from './components/LanguageSwitch';
+import './i18n';
 
 function App() {
+    const { t } = useTranslation();
     const [config, setConfig] = useState({
         RootDir: '',
         Username: '',
@@ -26,18 +30,18 @@ function App() {
                     const running = await IsServerRunning();
                     setIsRunning(running);
                     if (running) {
-                        setStatus('服务器正在运行');
+                        setStatus(t('messages.serverStarted'));
                     }
                     
                     setConfigLoaded(true);
                 } catch (error) {
                     console.error('Load config error:', error);
-                    setStatus('加载配置失败: ' + error);
+                    setStatus(t('messages.loadConfigError') + ': ' + error);
                 }
             };
             loadSavedConfig();
         }
-    }, [configLoaded]);
+    }, [configLoaded, t]);
 
     // 当配置改变时保存
     useEffect(() => {
@@ -48,12 +52,12 @@ function App() {
                     console.log('Config saved');
                 } catch (error) {
                     console.error('Save config error:', error);
-                    setStatus('保存配置失败: ' + error);
+                    setStatus(t('messages.saveConfigError') + ': ' + error);
                 }
             };
             saveConfig();
         }
-    }, [config, configLoaded]);
+    }, [config, configLoaded, t]);
 
     const handleAutoStartChange = async (e) => {
         const checked = e.target.checked;
@@ -62,7 +66,7 @@ function App() {
             setConfig(prev => ({ ...prev, AutoStart: checked }));
         } catch (error) {
             console.error('Set auto start error:', error);
-            setStatus('设置开机启动失败: ' + error);
+            setStatus(t('messages.setAutoStartError') + ': ' + error);
         }
     };
 
@@ -73,7 +77,7 @@ function App() {
                 setConfig(prev => ({ ...prev, RootDir: selectedDir }));
             }
         } catch (error) {
-            setStatus('选择目录失败: ' + error);
+            setStatus(t('messages.selectDirError') + ': ' + error);
         }
     };
 
@@ -81,9 +85,9 @@ function App() {
         try {
             await StartFTPServer(config);
             setIsRunning(true);
-            setStatus('服务器已启动');
+            setStatus(t('messages.serverStarted'));
         } catch (error) {
-            setStatus('启动失败: ' + error);
+            setStatus(t('messages.startServerError') + ': ' + error);
         }
     };
 
@@ -91,9 +95,9 @@ function App() {
         try {
             await StopFTPServer();
             setIsRunning(false);
-            setStatus('服务器已停止');
+            setStatus(t('messages.serverStopped'));
         } catch (error) {
-            setStatus('停止失败: ' + error);
+            setStatus(t('messages.stopServerError') + ': ' + error);
         }
     };
 
@@ -110,8 +114,9 @@ function App() {
             <div className="h-full max-w-2xl mx-auto bg-white/80 backdrop-blur-xl shadow-2xl flex flex-col">
                 {/* 标题栏 */}
                 <div className="bg-white/50 backdrop-blur-sm px-4 py-2 flex justify-between items-center" style={{ "--wails-draggable": "drag"}}>
-                    <div className="text-gray-700 font-semibold">Easy FTP Server</div>
-                    <div className="flex space-x-2">
+                    <div className="text-gray-700 font-semibold">{t('title')}</div>
+                    <div className="flex items-center space-x-2">
+                        <LanguageSwitch />
                         <button
                             onClick={handleMinimize}
                             className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors duration-150"
@@ -134,13 +139,13 @@ function App() {
                 {/* 主要内容 */}
                 <div className="flex-1 p-8 overflow-y-auto">
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold text-gray-800">FTP 服务器配置</h1>
-                        <p className="mt-2 text-sm text-gray-600">配置您的 FTP 服务器参数</p>
+                        <h1 className="text-2xl font-bold text-gray-800">{t('title')}</h1>
+                        <p className="mt-2 text-sm text-gray-600">{t('messages.configureServer')}</p>
                     </div>
                     
                     <div className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">根目录</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('settings.rootDir')}</label>
                             <div className="flex space-x-2">
                                 <input
                                     type="text"
@@ -150,7 +155,7 @@ function App() {
                                     className="flex-1 px-4 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-xl text-sm shadow-sm placeholder-gray-400
                                     focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
                                     disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
-                                    placeholder="选择 FTP 根目录"
+                                    placeholder={t('tooltips.rootDir')}
                                 />
                                 <button
                                     onClick={handleSelectFolder}
@@ -160,13 +165,13 @@ function App() {
                                     disabled:bg-gray-400 disabled:cursor-not-allowed
                                     shadow-sm transition-all duration-150 ease-in-out"
                                 >
-                                    浏览
+                                    {t('settings.selectDir')}
                                 </button>
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('settings.username')}</label>
                             <input
                                 type="text"
                                 value={config.Username}
@@ -175,12 +180,12 @@ function App() {
                                 className="w-full px-4 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-xl text-sm shadow-sm placeholder-gray-400
                                 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
                                 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
-                                placeholder="设置 FTP 用户名"
+                                placeholder={t('settings.username')}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('settings.password')}</label>
                             <input
                                 type="password"
                                 value={config.Password}
@@ -189,12 +194,12 @@ function App() {
                                 className="w-full px-4 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-xl text-sm shadow-sm placeholder-gray-400
                                 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
                                 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
-                                placeholder="设置 FTP 密码"
+                                placeholder={t('settings.password')}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">端口</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('settings.port')}</label>
                             <input
                                 type="text"
                                 value={config.Port}
@@ -203,7 +208,7 @@ function App() {
                                 className="w-full px-4 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-xl text-sm shadow-sm placeholder-gray-400
                                 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
                                 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
-                                placeholder="设置 FTP 端口"
+                                placeholder={t('tooltips.port')}
                             />
                         </div>
 
@@ -216,7 +221,7 @@ function App() {
                                 className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                             />
                             <label htmlFor="autoStart" className="ml-2 block text-sm text-gray-700">
-                                开机自动启动
+                                {t('settings.autoStart')}
                             </label>
                         </div>
 
@@ -226,9 +231,9 @@ function App() {
                                     onClick={handleStartServer}
                                     className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl 
                                     hover:from-indigo-700 hover:to-blue-700 focus:outline-none 
-                                  shadow-lg transition-all duration-150 ease-in-out"
+                                    shadow-lg transition-all duration-150 ease-in-out"
                                 >
-                                    启动服务器
+                                    {t('settings.start')}
                                 </button>
                             ) : (
                                 <button
@@ -237,20 +242,20 @@ function App() {
                                     hover:from-red-700 hover:to-pink-700 focus:outline-none 
                                     shadow-lg transition-all duration-150 ease-in-out"
                                 >
-                                    停止服务器
+                                    {t('settings.stop')}
                                 </button>
                             )}
                         </div>
 
-                        {/* {status && (
+                        {status && (
                             <div className={`mt-4 p-4 rounded-xl ${
-                                status.includes('成功') ? 'bg-green-50 text-green-700' : 
-                                status.includes('失败') ? 'bg-red-50 text-red-700' : 
+                                status.includes(t('messages.serverStarted')) ? 'bg-green-50 text-green-700' : 
+                                status.includes(t('messages.serverStopped')) ? 'bg-red-50 text-red-700' : 
                                 'bg-blue-50 text-blue-700'
                             }`}>
                                 {status}
                             </div>
-                        )} */}
+                        )}
                     </div>
                 </div>
             </div>
