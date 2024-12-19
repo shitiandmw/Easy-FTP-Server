@@ -7,10 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
+
+	_ "embed"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+//go:embed build/windows/icon.ico
+var iconBytes []byte
 
 // App struct
 type App struct {
@@ -42,22 +48,19 @@ func (a *App) startup(ctx context.Context) {
 		runtime.WindowHide(ctx)
 	})
 
-	// 如果是开机启动，则默认最小化
-	if config.AutoStart {
-		runtime.WindowHide(ctx)
-	}
-
 	// 启动系统托盘
 	go systray.Run(a.onSystrayReady, a.onSystrayExit)
+
+	// 如果是开机启动，等待一小段时间让托盘图标准备好，然后再最小化
+	if config.AutoStart {
+		time.Sleep(time.Millisecond * 500) // 给托盘图标一些初始化时间
+		runtime.WindowHide(ctx)
+	}
 }
 
 // 系统托盘准备就绪
 func (a *App) onSystrayReady() {
-	iconPath := "build/windows/icon.ico"
-	iconBytes, err := os.ReadFile(iconPath)
-	if err == nil {
-		systray.SetIcon(iconBytes)
-	}
+	systray.SetIcon(iconBytes)
 	systray.SetTitle("Easy FTP Server")
 	systray.SetTooltip("Easy FTP Server")
 
