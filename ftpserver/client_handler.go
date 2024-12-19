@@ -203,6 +203,26 @@ func (c *ClientHandler) Handle() {
 			c.handleRnfr(params)
 		case "RNTO":
 			c.handleRnto(params)
+		case "MKD":
+			c.handleMkd(params)
+		case "RMD":
+			c.handleRmd(params)
+		case "CDUP":
+			c.handleCdup()
+		case "SYST":
+			c.handleSyst()
+		case "NOOP":
+			c.handleNoop()
+		case "NLST":
+			c.handleNlst(params)
+		case "FEAT":
+			c.handleFeat()
+		case "OPTS":
+			c.handleOpts(params)
+		case "STAT":
+			c.handleStat(params)
+		case "APPE":
+			c.handleAppe(params)
 		default:
 			c.writeResponse(500, "Unknown command")
 		}
@@ -219,18 +239,41 @@ func (c *ClientHandler) handlePwd() {
 }
 
 func (c *ClientHandler) handleCwd(path string) {
-	path = filepath.FromSlash(path)
-	newPath := filepath.Join(c.workDir, path)
-	newPath = filepath.Clean(newPath)
-
-	if !strings.HasPrefix(newPath, c.rootDir) {
-		c.writeResponse(550, "Access denied")
+	if path == "" {
+		c.writeResponse(501, "Missing path")
 		return
 	}
 
+	// 处理特殊路径
+	if path == "/" {
+		c.workDir = c.rootDir
+		c.writeResponse(250, "Directory changed to root")
+		return
+	}
+
+	path = filepath.FromSlash(path)
+	var newPath string
+
+	if path == ".." {
+		// 返回上级目录
+		newPath = filepath.Dir(c.workDir)
+	} else if filepath.IsAbs(path) {
+		// 绝对路径
+		newPath = filepath.Clean(path)
+	} else {
+		// 相对路径
+		newPath = filepath.Clean(filepath.Join(c.workDir, path))
+	}
+
+	// 确保新路径在根目录内
+	if !strings.HasPrefix(newPath, c.rootDir) {
+		newPath = c.rootDir
+	}
+
+	// 检查目录是否存在且可访问
 	info, err := os.Stat(newPath)
 	if err != nil || !info.IsDir() {
-		c.writeResponse(550, "Directory does not exist")
+		c.writeResponse(550, "Directory not accessible")
 		return
 	}
 
@@ -560,16 +603,54 @@ func (c *ClientHandler) handleStor(params string) {
 		return
 	}
 
-	// 将文件名从 GBK 转换为 UTF-8
+	// 将文件名从 GBK 转换为 UTF-8，并规范化路径
 	filename := gbkToUTF8(params)
-	filename = filepath.Clean(filepath.Join(c.workDir, filename))
-	if !strings.HasPrefix(filename, c.rootDir) {
+	log.Printf("Original filename (UTF-8): %s\n", filename)
+
+	// 统一使用正斜杠，避免Windows和Unix路径混用
+	filename = strings.ReplaceAll(filename, "\\", "/")
+	log.Printf("Normalized filename: %s\n", filename)
+
+	// 获取相对于工作目录的路径
+	relPath := filename
+	if strings.HasPrefix(filename, "/") {
+		// 如果是绝对路径，将其转换为相对路径
+		relPath = strings.TrimPrefix(filename, "/")
+	}
+	log.Printf("Relative path: %s\n", relPath)
+
+	// 构建绝对路径
+	absPath := filepath.Clean(filepath.Join(c.workDir, relPath))
+	log.Printf("Working directory: %s\n", c.workDir)
+	log.Printf("Absolute path: %s\n", absPath)
+
+	// 安全检查：确保路径在根目录内
+	if !strings.HasPrefix(absPath, c.rootDir) {
+		log.Printf("Access denied. Path %s is outside root dir %s\n", absPath, c.rootDir)
 		c.writeResponse(550, "Access denied")
 		return
 	}
 
+	// 创建所有必要的父目录
+	targetDir := filepath.Dir(absPath)
+	log.Printf("Creating directory structure: %s\n", targetDir)
+
+	// 递归创建目录，如果已存在则忽略错误
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		log.Printf("Failed to create directory structure: %v\n", err)
+		c.writeResponse(550, "Cannot create directory structure")
+		return
+	}
+
+	// 检查目录是否创建成功
+	if dirInfo, err := os.Stat(targetDir); err != nil || !dirInfo.IsDir() {
+		log.Printf("Directory creation verification failed: %v\n", err)
+		c.writeResponse(550, "Failed to verify directory structure")
+		return
+	}
+
 	// 检查文件扩展名，确定是否为二进制文件
-	ext := strings.ToLower(filepath.Ext(filename))
+	ext := strings.ToLower(filepath.Ext(absPath))
 	binaryExts := map[string]bool{
 		".xlsx": true, ".xls": true, ".doc": true, ".docx": true,
 		".pdf": true, ".zip": true, ".rar": true, ".7z": true,
@@ -579,25 +660,38 @@ func (c *ClientHandler) handleStor(params string) {
 	}
 
 	// 如果是二进制文件，强制使用二进制模式
-	if binaryExts[ext] && c.transferType != "BINARY" {
-		log.Printf("Forcing binary mode for file type: %s\n", ext)
-		c.transferType = "BINARY"
+	if binaryExts[ext] {
+		if c.transferType != "BINARY" {
+			log.Printf("Forcing binary mode for file type: %s\n", ext)
+			c.transferType = "BINARY"
+		}
 	}
 
-	if c.passiveListener == nil && c.dataPort > 0 {
-		if err := c.openDataConn(); err != nil {
+	// 建立数据连接
+	if err := c.openDataConn(); err != nil {
+		if c.passiveListener == nil && c.dataPort > 0 {
+			log.Printf("Failed to open data connection: %v\n", err)
 			c.writeResponse(425, "Cannot open data connection")
 			return
 		}
 	}
 
-	if c.dataConn == nil {
+	if c.dataConn == nil && c.passiveListener != nil {
+		log.Printf("Waiting for passive mode connection...\n")
 		// 等待数据连接建立
-		deadline := time.Now().Add(time.Second * 5)
+		deadline := time.Now().Add(time.Second * 15)
 		for c.dataConn == nil && time.Now().Before(deadline) {
+			// 接受来自被动模式监听器的连接
+			conn, err := c.passiveListener.Accept()
+			if err == nil {
+				c.dataConn = conn
+				log.Printf("Passive mode connection established\n")
+				break
+			}
 			time.Sleep(100 * time.Millisecond)
 		}
 		if c.dataConn == nil {
+			log.Printf("Failed to establish data connection in passive mode\n")
 			c.writeResponse(425, "No data connection established")
 			return
 		}
@@ -619,57 +713,61 @@ func (c *ClientHandler) handleStor(params string) {
 	// 设置数据连接超时
 	c.dataConn.SetDeadline(time.Now().Add(time.Minute * 5))
 
-	// 以二进制模式打开文件
-	var flag int = os.O_CREATE | os.O_WRONLY
-	if c.transferType == "BINARY" {
-		flag |= os.O_TRUNC // 二进制模式下截断文件
-	}
-	file, err := os.OpenFile(filename, flag, 0666)
+	// 尝试创建或打开文件
+	log.Printf("Attempting to create file: %s\n", absPath)
+	file, err := os.OpenFile(absPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
 	if err != nil {
-		log.Printf("Failed to create file: %v\n", err)
-		c.writeResponse(550, "Cannot create file")
+		log.Printf("Failed to create file %s: %v\n", absPath, err)
+		c.writeResponse(550, fmt.Sprintf("Cannot create file: %v", err))
 		return
 	}
 	defer file.Close()
 
-	c.writeResponse(150, "Starting file transfer")
-
-	var n int64
-	if c.transferType == "ASCII" {
-		// ASCII模式：处理行结束符
-		reader := bufio.NewReader(c.dataConn)
-		writer := bufio.NewWriter(file)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil && err != io.EOF {
-				log.Printf("Failed to read data: %v\n", err)
-				c.writeResponse(550, "File transfer failed")
-				return
-			}
-			n += int64(len(line))
-			if err == io.EOF {
-				if len(line) > 0 {
-					writer.WriteString(line)
-				}
-				break
-			}
-			// 统一行结束符为系统默认
-			line = strings.TrimRight(line, "\r\n") + "\n"
-			writer.WriteString(line)
-		}
-		writer.Flush()
-	} else {
-		// 二进制模式：使用大缓冲区直接复制
-		buf := make([]byte, 1024*1024) // 1MB 缓冲区
-		n, err = io.CopyBuffer(file, c.dataConn, buf)
-		if err != nil {
-			log.Printf("File transfer failed: %v\n", err)
-			c.writeResponse(550, "File transfer failed")
-			return
-		}
+	// 验证文件是否成功创建
+	if _, err := os.Stat(absPath); err != nil {
+		log.Printf("File creation verification failed: %v\n", err)
+		c.writeResponse(550, "Failed to verify file creation")
+		return
 	}
 
-	c.writeResponse(226, fmt.Sprintf("Transfer complete, %d bytes received", n))
+	c.writeResponse(150, "Opening data connection for file upload")
+
+	// 使用缓冲写入器
+	bufferedWriter := bufio.NewWriter(file)
+	defer bufferedWriter.Flush()
+
+	var reader io.Reader = c.dataConn
+	if c.transferType == "ASCII" {
+		reader = NewASCIIReader(reader)
+	}
+
+	// 使用较大的缓冲区进行数据传输
+	buf := make([]byte, 32*1024) // 32KB buffer
+	written, err := io.CopyBuffer(bufferedWriter, reader, buf)
+	if err != nil {
+		log.Printf("Error during file upload to %s: %v\n", absPath, err)
+		c.writeResponse(550, "Error during file upload")
+		return
+	}
+
+	// 确保所有数据都写入磁盘
+	if err := bufferedWriter.Flush(); err != nil {
+		log.Printf("Error flushing data to disk for %s: %v\n", absPath, err)
+		c.writeResponse(550, "Error saving file")
+		return
+	}
+
+	// 再次验证文件是否存在且大小正确
+	if fileInfo, err := os.Stat(absPath); err != nil {
+		log.Printf("Final file verification failed: %v\n", err)
+		c.writeResponse(550, "Failed to verify file")
+		return
+	} else {
+		log.Printf("File size on disk: %d bytes\n", fileInfo.Size())
+	}
+
+	log.Printf("Successfully uploaded %d bytes to %s\n", written, absPath)
+	c.writeResponse(226, fmt.Sprintf("Transfer complete, %d bytes received", written))
 }
 
 func (c *ClientHandler) handleRetr(params string) {
@@ -884,6 +982,293 @@ func (c *ClientHandler) handleRnto(params string) {
 	c.writeResponse(250, "Rename successful")
 }
 
+func (c *ClientHandler) handleMkd(params string) {
+	if params == "" {
+		c.writeResponse(501, "Missing directory name")
+		return
+	}
+
+	path := filepath.Join(c.workDir, params)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		c.writeResponse(550, "Invalid path")
+		return
+	}
+
+	if !strings.HasPrefix(absPath, c.rootDir) {
+		c.writeResponse(550, "Access denied")
+		return
+	}
+
+	err = os.MkdirAll(absPath, 0755)
+	if err != nil {
+		c.writeResponse(550, fmt.Sprintf("Failed to create directory: %v", err))
+		return
+	}
+
+	c.writeResponse(257, fmt.Sprintf("\"%s\" created", params))
+}
+
+func (c *ClientHandler) handleRmd(params string) {
+	if params == "" {
+		c.writeResponse(501, "Missing directory name")
+		return
+	}
+
+	path := filepath.Join(c.workDir, params)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		c.writeResponse(550, "Invalid path")
+		return
+	}
+
+	if !strings.HasPrefix(absPath, c.rootDir) {
+		c.writeResponse(550, "Access denied")
+		return
+	}
+
+	// 检查目录是否存在且是否为空
+	dir, err := os.Open(absPath)
+	if err != nil {
+		c.writeResponse(550, "Directory not found")
+		return
+	}
+	defer dir.Close()
+
+	_, err = dir.Readdir(1)
+	if err != io.EOF {
+		c.writeResponse(550, "Directory not empty")
+		return
+	}
+
+	err = os.Remove(absPath)
+	if err != nil {
+		c.writeResponse(550, fmt.Sprintf("Failed to remove directory: %v", err))
+		return
+	}
+
+	c.writeResponse(250, "Directory removed")
+}
+
+func (c *ClientHandler) handleCdup() {
+	// 切换到上级目录，等同于 CWD ..
+	c.handleCwd("..")
+}
+
+func (c *ClientHandler) handleSyst() {
+	// 返回标准的UNIX类型响应
+	c.writeResponse(215, "UNIX Type: L8")
+}
+
+func (c *ClientHandler) handleNoop() {
+	// 空操作，保持连接
+	c.writeResponse(200, "OK")
+}
+
+func (c *ClientHandler) handleNlst(params string) {
+	// 建立数据连接
+	err := c.openDataConn()
+	if err != nil {
+		c.writeResponse(425, "Cannot establish data connection")
+		return
+	}
+	defer c.dataConn.Close()
+
+	targetDir := c.workDir
+	if params != "" {
+		path := filepath.Join(c.workDir, params)
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			c.writeResponse(550, "Invalid path")
+			return
+		}
+		if !strings.HasPrefix(absPath, c.rootDir) {
+			c.writeResponse(550, "Access denied")
+			return
+		}
+		targetDir = absPath
+	}
+
+	c.writeResponse(150, "Starting file list transfer")
+
+	files, err := os.ReadDir(targetDir)
+	if err != nil {
+		c.writeResponse(550, "Failed to read directory")
+		return
+	}
+
+	writer := bufio.NewWriter(c.dataConn)
+	for _, file := range files {
+		// NLST只返回文件名，每行一个
+		writer.WriteString(file.Name() + "\r\n")
+	}
+	writer.Flush()
+
+	c.writeResponse(226, "Transfer complete")
+}
+
+func (c *ClientHandler) handleFeat() {
+	// 返回服务器支持的特性列表
+	c.writeResponse(211, "-Features supported:")
+	c.writer.WriteString(" UTF8\r\n")
+	c.writer.WriteString(" SIZE\r\n")
+	c.writer.WriteString(" MDTM\r\n")
+	c.writer.WriteString(" REST STREAM\r\n")
+	c.writer.WriteString(" PASV\r\n")
+	c.writer.WriteString(" EPSV\r\n")
+	c.writer.WriteString(" EPRT\r\n")
+	c.writer.WriteString("211 End")
+	c.writer.Flush()
+}
+
+func (c *ClientHandler) handleOpts(params string) {
+	if params == "" {
+		c.writeResponse(501, "Missing option")
+		return
+	}
+
+	// 解析选项和值
+	parts := strings.Fields(params)
+	option := strings.ToUpper(parts[0])
+
+	switch option {
+	case "UTF8":
+		if len(parts) > 1 {
+			value := strings.ToUpper(parts[1])
+			switch value {
+			case "ON":
+				// 启用UTF8
+				c.writeResponse(200, "UTF8 mode enabled")
+			case "OFF":
+				// 禁用UTF8
+				c.writeResponse(200, "UTF8 mode disabled")
+			default:
+				c.writeResponse(501, "Invalid value for UTF8")
+			}
+		} else {
+			// 如果没有指定值，返回当前状态
+			c.writeResponse(200, "UTF8 mode enabled")
+		}
+	case "MLST":
+		if len(parts) > 1 {
+			// MLST的值是以分号分隔的事实列表
+			facts := strings.Split(parts[1], ";")
+			validFacts := []string{}
+			for _, fact := range facts {
+				fact = strings.TrimSpace(strings.ToUpper(fact))
+				switch fact {
+				case "TYPE", "SIZE", "MODIFY", "PERM", "UNIX.MODE",
+					"UNIX.OWNER", "UNIX.GROUP", "UNIX.UID", "UNIX.GID":
+					validFacts = append(validFacts, fact)
+				}
+			}
+			if len(validFacts) > 0 {
+				response := fmt.Sprintf("MLST OPTS %s;", strings.Join(validFacts, ";"))
+				c.writeResponse(200, response)
+			} else {
+				c.writeResponse(501, "No valid facts specified")
+			}
+		} else {
+			// 如果没有指定值，返回支持的所有facts
+			c.writeResponse(200, "MLST OPTS Type;Size;Modify;Perm;")
+		}
+	default:
+		c.writeResponse(501, "Option not supported")
+	}
+}
+
+func (c *ClientHandler) handleStat(params string) {
+	if params == "" {
+		// 返回服务器状态
+		c.writeResponse(211, "-FTP Server Status:")
+		c.writer.WriteString(fmt.Sprintf(" Connected from: %s\r\n", c.conn.RemoteAddr()))
+		c.writer.WriteString(fmt.Sprintf(" Logged in as: %s\r\n", c.username))
+		c.writer.WriteString(fmt.Sprintf(" Type: %s\r\n", c.transferType))
+		c.writer.WriteString(fmt.Sprintf(" Working Directory: %s\r\n", c.workDir))
+		c.writer.WriteString("211 End of status")
+		c.writer.Flush()
+		return
+	}
+
+	// 如果提供了参数，则返回文件或目录的状态
+	path := filepath.Join(c.workDir, params)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		c.writeResponse(550, "Invalid path")
+		return
+	}
+
+	if !strings.HasPrefix(absPath, c.rootDir) {
+		c.writeResponse(550, "Access denied")
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		c.writeResponse(550, "File not found")
+		return
+	}
+
+	c.writeResponse(213, "-Status follows:")
+	c.writer.WriteString(formatFileInfo(info, filepath.Base(absPath)) + "\r\n")
+	c.writer.WriteString("213 End of status")
+	c.writer.Flush()
+}
+
+func (c *ClientHandler) handleAppe(params string) {
+	if params == "" {
+		c.writeResponse(501, "Missing file name")
+		return
+	}
+
+	path := filepath.Join(c.workDir, params)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		c.writeResponse(550, "Invalid path")
+		return
+	}
+
+	if !strings.HasPrefix(absPath, c.rootDir) {
+		c.writeResponse(550, "Access denied")
+		return
+	}
+
+	// 以追加模式打开文件
+	file, err := os.OpenFile(absPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		c.writeResponse(550, fmt.Sprintf("Failed to open file: %v", err))
+		return
+	}
+	defer file.Close()
+
+	err = c.openDataConn()
+	if err != nil {
+		c.writeResponse(425, "Cannot establish data connection")
+		return
+	}
+	defer c.dataConn.Close()
+
+	c.writeResponse(150, "Opening data connection for file append")
+
+	// 使用缓冲写入器
+	bufferedWriter := bufio.NewWriter(file)
+	defer bufferedWriter.Flush()
+
+	var reader io.Reader = c.dataConn
+	if c.transferType == "ASCII" {
+		// ASCII模式需要处理行尾转换
+		reader = NewASCIIReader(reader)
+	}
+
+	_, err = io.Copy(bufferedWriter, reader)
+	if err != nil {
+		c.writeResponse(550, fmt.Sprintf("Error appending to file: %v", err))
+		return
+	}
+
+	c.writeResponse(226, "Transfer complete")
+}
+
 // 转换 UTF-8 到 GBK
 func utf8ToGBK(text string) string {
 	encoder := simplifiedchinese.GBK.NewEncoder()
@@ -904,4 +1289,85 @@ func gbkToUTF8(text string) string {
 		return text
 	}
 	return string(utf8Bytes)
+}
+
+func formatFileInfo(info os.FileInfo, name string) string {
+	// 使用标准格式输出文件信息
+	size := info.Size()
+	date := info.ModTime().Format("Jan _2 15:04")
+	perms := info.Mode().String()
+
+	return fmt.Sprintf("%s %8d %s %s", perms, size, date, name)
+}
+
+// ASCIIReader 处理ASCII模式下的行尾转换
+type ASCIIReader struct {
+	reader   io.Reader
+	buffer   []byte
+	pos      int
+	lastChar byte
+	sawCR    bool
+}
+
+func NewASCIIReader(reader io.Reader) *ASCIIReader {
+	return &ASCIIReader{
+		reader: reader,
+		buffer: make([]byte, 4096),
+		pos:    0,
+	}
+}
+
+func (r *ASCIIReader) Read(p []byte) (n int, err error) {
+	// 如果缓冲区为空，从底层reader读取数据
+	if r.pos >= len(r.buffer) {
+		n, err := r.reader.Read(r.buffer)
+		if n == 0 {
+			return 0, err
+		}
+		r.buffer = r.buffer[:n]
+		r.pos = 0
+	}
+
+	// 处理行尾转换
+	i := 0
+	for i < len(p) && r.pos < len(r.buffer) {
+		c := r.buffer[r.pos]
+		r.pos++
+
+		// 处理CR和LF
+		if r.sawCR {
+			r.sawCR = false
+			if c != '\n' {
+				p[i] = '\n'
+				i++
+				if i < len(p) {
+					p[i] = c
+					i++
+				} else {
+					// 需要回退一个字符，因为缓冲区满了
+					r.pos--
+				}
+			} else {
+				p[i] = '\n'
+				i++
+			}
+		} else if c == '\r' {
+			r.sawCR = true
+		} else if c == '\n' {
+			p[i] = '\n'
+			i++
+		} else {
+			p[i] = c
+			i++
+		}
+	}
+
+	// 如果最后一个字符是CR，需要等待下一次读取
+	if r.sawCR && r.pos >= len(r.buffer) {
+		p[i] = '\n'
+		i++
+		r.sawCR = false
+	}
+
+	return i, nil
 }
