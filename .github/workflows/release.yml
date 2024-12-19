@@ -56,9 +56,9 @@ jobs:
 
       - name: Zip Release
         run: |
-          cd build
-          7z a ../EasyFTPServer-windows-amd64.zip *
-          cd ..
+          cd build/bin
+          7z a ../../EasyFTPServer-windows-amd64.zip EasyFTPServer.exe
+          cd ../..
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1

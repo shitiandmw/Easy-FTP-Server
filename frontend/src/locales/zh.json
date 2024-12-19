@@ -26,7 +26,7 @@
   },
   "tooltips": {
     "autoStart": "系统启动时自动运行服务器",
-    "port": "FTP 服务器端口（默认：2121）",
+    "port": "FTP 服务器端口（默认：21）",
     "rootDir": "通过 FTP 共享的目录"
   }
 }

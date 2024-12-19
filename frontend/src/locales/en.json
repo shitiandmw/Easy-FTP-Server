@@ -26,7 +26,7 @@
   },
   "tooltips": {
     "autoStart": "Start server when system boots",
-    "port": "FTP server port (default: 2121)",
+    "port": "FTP server port (default: 21)",
     "rootDir": "Directory to share via FTP"
   }
 }

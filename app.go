@@ -188,7 +188,7 @@ func (a *App) GetDefaultConfig() DefaultConfig {
 		RootDir:  rootDir,
 		Username: "admin",  // 默认用户名
 		Password: "123456", // 默认密码
-		Port:     "2121",   // 默认端口
+		Port:     "21",     // 默认端口
 	}
 }
 
@@ -312,8 +312,8 @@ func (a *App) MinimizeToTray() {
 
 // GetServerIP returns the server's IP address
 func (a *App) GetServerIP() string {
-    if ftpServer == nil {
-        return ""
-    }
-    return ftpServer.GetServerIP()
+	if ftpServer == nil {
+		return ""
+	}
+	return ftpServer.GetServerIP()
 }
