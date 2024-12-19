@@ -32,7 +32,7 @@ func NewFTPServer(rootDir string) *FTPServer {
 		rootDir:  rootDir,
 		username: "admin",
 		password: "123456",
-		port:     "21",
+		port:     "2121",
 	}
 }
 
@@ -326,7 +326,7 @@ func (s *FTPServer) Start() error {
 		Port: func() int {
 			port, err := strconv.Atoi(s.port)
 			if err != nil {
-				return 21 // 默认端口
+				return 2121 // 默认端口
 			}
 			return port
 		}(),
