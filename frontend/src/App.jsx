@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StartFTPServer, StopFTPServer, OpenDirectoryDialog, LoadConfig, SaveConfig, SetAutoStart, CheckAutoStart, IsServerRunning, MinimizeToTray } from "../wailsjs/go/main/App";
+import { StartFTPServer, StopFTPServer, OpenDirectoryDialog, LoadConfig, SaveConfig, SetAutoStart, CheckAutoStart, IsServerRunning, MinimizeToTray, GetServerIP } from "../wailsjs/go/main/App";
 import { WindowMinimise, Quit } from "../wailsjs/runtime/runtime";
 import LanguageSwitch from './components/LanguageSwitch';
 import './i18n';
@@ -17,6 +17,28 @@ function App() {
     const [status, setStatus] = useState('');
     const [isRunning, setIsRunning] = useState(false);
     const [configLoaded, setConfigLoaded] = useState(false);
+    const [serverIP, setServerIP] = useState('');
+    const [copyNotification, setCopyNotification] = useState(false);
+
+    const getLocalIP = () => {
+        const interfaces = Object.values(window.navigator.userAgentData?.platform === 'Windows' ? {} : {})
+            .filter(iface => !iface.internal)
+            .map(iface => iface.address)
+            .filter(addr => addr.match(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/));
+        return interfaces[0] || 'localhost';
+    };
+
+    const copyToClipboard = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopyNotification(true);
+            setTimeout(() => {
+                setCopyNotification(false);
+            }, 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
+    };
 
     useEffect(() => {
         if (!configLoaded) {
@@ -59,6 +81,19 @@ function App() {
         }
     }, [config, configLoaded, t]);
 
+    const updateServerIP = async () => {
+        if (isRunning) {
+            const ip = await GetServerIP();
+            setServerIP(`ftp://${ip}:${config.Port}`);
+        } else {
+            setServerIP('');
+        }
+    };
+
+    useEffect(() => {
+        updateServerIP();
+    }, [isRunning, config.Port]);
+
     const handleAutoStartChange = async (e) => {
         const checked = e.target.checked;
         try {
@@ -86,6 +121,7 @@ function App() {
             await StartFTPServer(config);
             setIsRunning(true);
             setStatus(t('messages.serverStarted'));
+            updateServerIP();
         } catch (error) {
             setStatus(t('messages.startServerError') + ': ' + error);
         }
@@ -96,6 +132,7 @@ function App() {
             await StopFTPServer();
             setIsRunning(false);
             setStatus(t('messages.serverStopped'));
+            setServerIP('');
         } catch (error) {
             setStatus(t('messages.stopServerError') + ': ' + error);
         }
@@ -247,18 +284,127 @@ function App() {
                             )}
                         </div>
 
-                        {status && (
-                            <div className={`mt-4 p-4 rounded-xl ${
-                                status.includes(t('messages.serverStarted')) ? 'bg-green-50 text-green-700' : 
-                                status.includes(t('messages.serverStopped')) ? 'bg-red-50 text-red-700' : 
-                                'bg-blue-50 text-blue-700'
-                            }`}>
-                                {status}
+                        <div className={`server-status ${isRunning ? 'running' : 'stopped'}`}>
+                            <div className="status-message">
+                                <span className="status-text">{isRunning ? t('messages.serverStarted') : t('messages.serverStopped')}</span>
+                                <div className="server-address">
+                                    {isRunning && serverIP ? (
+                                        <>
+                                            <span className="address">{serverIP}</span>
+                                            <div className="copy-container">
+                                                <button 
+                                                    className="copy-button"
+                                                    onClick={() => copyToClipboard(serverIP)}
+                                                >
+                                                    {t('buttons.copy')}
+                                                </button>
+                                                {copyNotification && (
+                                                    <div className="copy-notification">
+                                                        {t('messages.copied')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <span className="address placeholder">-</span>
+                                    )}
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>
+            <style>{`
+                .server-status {
+                    margin: 20px 0;
+                    padding: 15px;
+                    border-radius: 8px;
+                    height: 90px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    transition: background-color 0.3s ease;
+                }
+                .server-status.running {
+                    background: #e8f5e9;
+                }
+                .server-status.stopped {
+                    background: #ffebee;
+                }
+                .status-message {
+                    text-align: center;
+                    color: #37474f;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                .status-text {
+                    font-size: 15px;
+                    font-weight: 500;
+                }
+                .server-address {
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                }
+                .address {
+                    font-family: monospace;
+                    background: rgba(255, 255, 255, 0.7);
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    color: #212529;
+                    min-width: 120px;
+                    text-align: center;
+                }
+                .address.placeholder {
+                    color: #9e9e9e;
+                }
+                .copy-container {
+                    position: relative;
+                }
+                .copy-button {
+                    padding: 6px 12px;
+                    background: #4a90e2;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                }
+                .copy-button:hover {
+                    background: #357abd;
+                    transform: translateY(-1px);
+                }
+                .copy-button:active {
+                    transform: translateY(0);
+                }
+                .copy-notification {
+                    position: absolute;
+                    bottom: calc(100% + 5px);
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                    animation: fadeIn 0.2s ease;
+                }
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, 5px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                }
+            `}</style>
         </div>
     );
 }

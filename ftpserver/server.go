@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/goftp/server"
+	"os/exec"
 )
 
 type FTPServer struct {
@@ -199,6 +202,88 @@ func (driver *ftpDriver) PutFile(path string, data io.Reader, append bool) (int6
 
 func (driver *ftpDriver) realPath(path string) string {
 	return filepath.Join(driver.rootDir, path)
+}
+
+// pingIP attempts to ping an IP address and returns true if successful
+func pingIP(ip string) bool {
+    // 使用 -n 1 只ping一次，-w 1000 等待超时1秒
+    cmd := exec.Command("ping", "-n", "1", "-w", "1000", ip)
+    err := cmd.Run()
+    return err == nil
+}
+
+// getGatewayIP returns the gateway IP for a given local IP
+func getGatewayIP(localIP string) string {
+    // 假设网关是 .1，例如 192.168.1.1
+    parts := strings.Split(localIP, ".")
+    if len(parts) == 4 {
+        return strings.Join([]string{parts[0], parts[1], parts[2], "1"}, ".")
+    }
+    return ""
+}
+
+// GetServerIP returns the server's IP address
+func (s *FTPServer) GetServerIP() string {
+    // 使用 UDP 连接到一个公共 IP（这里用 8.8.8.8:53，不会真正建立连接）
+    conn, err := net.Dial("udp", "8.8.8.8:53")
+    if err != nil {
+        // 如果无法建立连接，回退到备用方法
+        return s.getIPByInterfaces()
+    }
+    defer conn.Close()
+
+    // 获取本地地址
+    localAddr := conn.LocalAddr().(*net.UDPAddr)
+    return localAddr.IP.String()
+}
+
+// getIPByInterfaces 是一个备用方法，用于在无法建立 UDP 连接时获取 IP
+func (s *FTPServer) getIPByInterfaces() string {
+    ifaces, err := net.Interfaces()
+    if err != nil {
+        return "localhost"
+    }
+
+    for _, iface := range ifaces {
+        // 跳过禁用的接口和回环接口
+        if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+            continue
+        }
+
+        addrs, err := iface.Addrs()
+        if err != nil {
+            continue
+        }
+
+        for _, addr := range addrs {
+            var ip net.IP
+            switch v := addr.(type) {
+            case *net.IPNet:
+                ip = v.IP
+            case *net.IPAddr:
+                ip = v.IP
+            }
+
+            // 只考虑 IPv4 私有地址
+            if ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+                continue
+            }
+
+            // 跳过本地链路地址
+            if ip.IsLinkLocalUnicast() {
+                continue
+            }
+
+            // 跳过以.1结尾的地址（可能是网关）
+            if strings.HasSuffix(ip.String(), ".1") {
+                continue
+            }
+
+            return ip.String()
+        }
+    }
+
+    return "localhost"
 }
 
 // 启动 FTP 服务器

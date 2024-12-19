@@ -309,3 +309,11 @@ func (a *App) IsServerRunning() bool {
 func (a *App) MinimizeToTray() {
 	runtime.WindowHide(a.ctx)
 }
+
+// GetServerIP returns the server's IP address
+func (a *App) GetServerIP() string {
+    if ftpServer == nil {
+        return ""
+    }
+    return ftpServer.GetServerIP()
+}

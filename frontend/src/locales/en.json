@@ -17,7 +17,12 @@
     "configSaved": "Configuration saved",
     "configError": "Configuration error",
     "serverRunning": "Server is running",
-    "serverNotRunning": "Server is not running"
+    "serverNotRunning": "Server is not running",
+    "configureServer": "Configure Server",
+    "copied": "Copied to clipboard"
+  },
+  "buttons": {
+    "copy": "Copy"
   },
   "tooltips": {
     "autoStart": "Start server when system boots",

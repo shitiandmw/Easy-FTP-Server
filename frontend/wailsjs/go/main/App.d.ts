@@ -6,6 +6,8 @@ export function CheckAutoStart():Promise<boolean>;
 
 export function GetDefaultConfig():Promise<main.DefaultConfig>;
 
+export function GetServerIP():Promise<string>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function IsServerRunning():Promise<boolean>;

@@ -20,11 +20,11 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:     "Easy FTP Server",
 		Width:     500,
-		Height:    670,
+		Height:    780,
 		MinWidth:  500,
-		MinHeight: 670,
+		MinHeight: 780,
 		MaxWidth:  500,
-		MaxHeight: 670,
+		MaxHeight: 780,
 		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,

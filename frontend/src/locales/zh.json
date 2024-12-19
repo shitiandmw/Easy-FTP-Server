@@ -17,7 +17,12 @@
     "configSaved": "配置已保存",
     "configError": "配置错误",
     "serverRunning": "服务器运行中",
-    "serverNotRunning": "服务器未运行"
+    "serverNotRunning": "服务器未运行",
+    "configureServer": "配置服务器",
+    "copied": "已复制到剪贴板"
+  },
+  "buttons": {
+    "copy": "复制"
   },
   "tooltips": {
     "autoStart": "系统启动时自动运行服务器",
