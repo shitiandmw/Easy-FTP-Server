@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         platform: [windows-latest]
-        go-version: [1.18]
+        go-version: [1.22.0]
         node-version: [16.x]
     runs-on: ${{ matrix.platform }}
     steps:
