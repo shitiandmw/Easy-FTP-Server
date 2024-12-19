@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Easy FTP Server",
+  "outputfilename": "EasyFTPServer",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "shitiandmw",
+    "email": "lushitian405@gmail.com"
+  },
+  "info": {
+    "companyName": "github.com/shitiandmw",
+    "productName": "Easy FTP Server",
+    "productVersion": "1.0.0",
+    "copyright": " 2024 shitiandmw",
+    "comments": "A simple and easy-to-use FTP server"
+  }
+}

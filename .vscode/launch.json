@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Wails: Debug Frontend",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:34115",
+            "webRoot": "${workspaceFolder}/frontend"
+        }
+    ]
+}
