@@ -52,6 +52,14 @@ Special thanks to these amazing projects that made this simple FTP server possib
 
 ## 🚀 Quick Start
 
+### Download
+
+You can download the latest pre-built binaries from the [Releases](https://github.com/shitiandmw/easy-ftp-server/releases) page.
+
+| Platform | Architecture | Download |
+|----------|-------------|----------|
+| Windows | 64-bit | [EasyFTPServer-windows-amd64.zip](https://github.com/shitiandmw/easy-ftp-server/releases/latest/download/EasyFTPServer-windows-amd64.zip) |
+
 ### User Guide
 
 1. Download the latest version
