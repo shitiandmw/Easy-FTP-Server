@@ -19,6 +19,7 @@ type FTPServer struct {
 	port     string
 	server   *server.Server
 	mu       sync.Mutex
+	logFile  *os.File
 }
 
 // 创建新的 FTP 服务器实例
@@ -209,6 +210,24 @@ func (s *FTPServer) Start() error {
 		return fmt.Errorf("server is already running")
 	}
 
+	// 设置日志
+	logDir := "logs"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory: %v", err)
+	}
+
+	// 每次启动时创建新的日志文件
+	logPath := filepath.Join(logDir, "ftpserver.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create log file: %v", err)
+	}
+	s.logFile = logFile
+
+	// 设置日志输出到文件和控制台
+	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	log.SetFlags(log.Ldate | log.Ltime)
+
 	// 创建驱动工厂
 	factory := &ftpDriverFactory{
 		rootDir: s.rootDir,
@@ -258,6 +277,12 @@ func (s *FTPServer) Stop() error {
 
 	if err := s.server.Shutdown(); err != nil {
 		return fmt.Errorf("failed to stop server: %v", err)
+	}
+
+	// 关闭日志文件
+	if s.logFile != nil {
+		s.logFile.Close()
+		s.logFile = nil
 	}
 
 	s.server = nil
